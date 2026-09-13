@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onBeforeUnmount } from 'vue'
 
-// Заглушки — без логики, только UI-состояние для отображения каркаса
 const isPlaying = ref(false)
 const selectedVisualizer = ref('bars')
 
@@ -12,25 +11,94 @@ const visualizers = [
   { value: 'particles', label: 'Частицы' },
 ]
 
-// Заглушка прогресса/названия трека — потом заменится реальными данными
-const currentTime = '00:45'
-const totalTime = '05:59'
-const trackTitle = 'Linkin Park - Numb'
+// Состояние плеера
+const audio = new Audio()
+const fileInput = ref<HTMLInputElement | null>(null)
+
+const trackTitle = ref('Файл не выбран')
+const fileSizeMb = ref<string | null>(null)
+const currentTime = ref(0)
+const duration = ref(0)
+
+let objectUrl: string | null = null
+
+function formatTime(seconds: number): string {
+  if (!Number.isFinite(seconds)) return '00:00'
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
 
 function togglePlay() {
-  isPlaying.value = !isPlaying.value
+  if (!audio.src) return
+  if (isPlaying.value) {
+    audio.pause()
+  } else {
+    audio.play()
+  }
 }
 
 function chooseFile() {
-  // TODO: логика выбора файла появится позже
+  fileInput.value?.click()
 }
+
+function onFileSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  // Освобождаем предыдущий URL, если был
+  if (objectUrl) {
+    URL.revokeObjectURL(objectUrl)
+  }
+
+  objectUrl = URL.createObjectURL(file)
+  audio.src = objectUrl
+
+  // Имя файла без расширения — как временное название трека
+  trackTitle.value = file.name.replace(/\.[^/.]+$/, '')
+  fileSizeMb.value = (file.size / (1024 * 1024)).toFixed(2)
+
+  audio.play()
+
+  // Сбрасываем input, чтобы можно было повторно выбрать тот же файл
+  input.value = ''
+}
+
+audio.addEventListener('play', () => {
+  isPlaying.value = true
+})
+audio.addEventListener('pause', () => {
+  isPlaying.value = false
+})
+audio.addEventListener('ended', () => {
+  isPlaying.value = false
+})
+audio.addEventListener('timeupdate', () => {
+  currentTime.value = audio.currentTime
+})
+audio.addEventListener('loadedmetadata', () => {
+  duration.value = audio.duration
+})
+
+onBeforeUnmount(() => {
+  audio.pause()
+  if (objectUrl) {
+    URL.revokeObjectURL(objectUrl)
+  }
+})
 </script>
 
 <template>
   <header class="top-menu">
     <div class="row row-1">
       <div class="cell">
-        <button class="btn play-btn" type="button" @click="togglePlay">
+        <button
+          class="btn play-btn"
+          type="button"
+          :disabled="!fileSizeMb"
+          @click="togglePlay"
+        >
           {{ isPlaying ? '⏹ Stop' : '▶ Play' }}
         </button>
       </div>
@@ -39,6 +107,13 @@ function chooseFile() {
         <button class="btn" type="button" @click="chooseFile">
           📂 Выбрать файл
         </button>
+        <input
+          ref="fileInput"
+          type="file"
+          accept="audio/mpeg,audio/mp4,.mp3,.m4a"
+          class="hidden-input"
+          @change="onFileSelected"
+        />
       </div>
 
       <div class="cell">
@@ -55,10 +130,14 @@ function chooseFile() {
     </div>
 
     <div class="row row-2">
-      <div class="cell track-info" colspan="3">
-        <span class="progress">{{ currentTime }} / {{ totalTime }}</span>
+      <div class="cell track-info">
+        <span class="progress">{{ formatTime(currentTime) }} / {{ formatTime(duration) }}</span>
         <span class="separator">|</span>
         <span class="track-title">{{ trackTitle }}</span>
+        <template v-if="fileSizeMb">
+          <span class="separator">|</span>
+          <span class="file-size">{{ fileSizeMb }} MB</span>
+        </template>
       </div>
     </div>
   </header>
@@ -104,6 +183,7 @@ function chooseFile() {
   gap: 8px;
   font-size: 0.9rem;
   color: #aaa;
+  flex-wrap: wrap;
 }
 
 .progress {
@@ -120,6 +200,15 @@ function chooseFile() {
   font-weight: 500;
 }
 
+.file-size {
+  color: #ffb37f;
+  font-variant-numeric: tabular-nums;
+}
+
+.hidden-input {
+  display: none;
+}
+
 .btn {
   width: 100%;
   padding: 6px 10px;
@@ -132,8 +221,13 @@ function chooseFile() {
   transition: background 0.15s ease;
 }
 
-.btn:hover {
+.btn:hover:not(:disabled) {
   background: #3a3a40;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .play-btn {
