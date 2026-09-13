@@ -92,20 +92,28 @@ onBeforeUnmount(() => {
 <template>
   <header class="top-menu">
     <div class="row row-1">
-      <div class="cell">
+      <div class="cell cell-transport">
         <button
-          class="btn play-btn"
+          class="btn btn-small play-btn"
           type="button"
-          :disabled="!fileSizeMb"
+          :disabled="!fileSizeMb || isPlaying"
           @click="togglePlay"
         >
-          {{ isPlaying ? '⏹ Stop' : '▶ Play' }}
+          ▶
+        </button>
+        <button
+          class="btn btn-small stop-btn"
+          type="button"
+          :disabled="!fileSizeMb || !isPlaying"
+          @click="togglePlay"
+        >
+          ⏹
         </button>
       </div>
 
-      <div class="cell">
-        <button class="btn" type="button" @click="chooseFile">
-          📂 Выбрать файл
+      <div class="cell cell-file">
+        <button class="btn btn-icon" type="button" title="Выбрать файл" @click="chooseFile">
+          📂
         </button>
         <input
           ref="fileInput"
@@ -157,16 +165,20 @@ onBeforeUnmount(() => {
 
 .row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
   align-items: center;
 }
 
 .row-1 {
+  grid-template-columns: auto auto auto;
+  justify-content: center;
   padding: 8px 12px;
-  gap: 12px;
+  gap: 20px;
+  width: fit-content;
+  margin: 0 auto;
 }
 
 .row-2 {
+  grid-template-columns: 1fr;
   padding: 4px 12px 10px;
   border-top: 1px solid #2a2a2e;
 }
@@ -178,7 +190,6 @@ onBeforeUnmount(() => {
 }
 
 .track-info {
-  grid-column: 1 / span 3;
   justify-content: center;
   gap: 8px;
   font-size: 0.9rem;
@@ -209,8 +220,15 @@ onBeforeUnmount(() => {
   display: none;
 }
 
+.cell-transport {
+  gap: 6px;
+}
+
+.cell-file {
+  justify-content: flex-end;
+}
+
 .btn {
-  width: 100%;
   padding: 6px 10px;
   background: #2a2a2e;
   border: 1px solid #3a3a40;
@@ -226,17 +244,40 @@ onBeforeUnmount(() => {
 }
 
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
+}
+
+.btn-small {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  line-height: 1;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .play-btn {
   color: #7fffa1;
-  font-weight: 600;
+}
+
+.stop-btn {
+  color: #ff8f8f;
 }
 
 .visualizer-select {
-  width: 100%;
   padding: 6px 8px;
   background: #2a2a2e;
   border: 1px solid #3a3a40;
