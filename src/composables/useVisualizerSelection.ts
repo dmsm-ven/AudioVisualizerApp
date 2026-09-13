@@ -6,10 +6,7 @@ export interface VisualizerOption {
 }
 
 export const visualizers: VisualizerOption[] = [
-  { value: 'bars', label: 'Спектр (столбцы)' },
-  { value: 'mirrored-bars', label: 'Зеркальный спектр' },
-  { value: 'plasma', label: 'Плазма (жидкие волны)' },
-  { value: 'pulse-rings', label: 'Кольца (пульсация)' },
+  { value: 'butterchurn', label: 'MilkDrop (Butterchurn)' },
 ]
 
 const selectedVisualizer = ref<string>(visualizers[0]?.value ?? 'bars')

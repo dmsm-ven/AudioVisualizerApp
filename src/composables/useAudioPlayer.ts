@@ -80,5 +80,6 @@ export function useAudioPlayer() {
     loadFile,
     togglePlay,
     getAnalyser: () => analyser,
+    getAudioContext: () => audioContext,
   }
 }
