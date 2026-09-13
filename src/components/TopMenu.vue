@@ -1,41 +1,22 @@
 <script setup lang="ts">
-import { ref, onBeforeUnmount } from 'vue'
+import { ref } from 'vue'
+import { useAudioPlayer } from '../composables/useAudioPlayer'
 
-const isPlaying = ref(false)
+const { isPlaying, currentTime, duration, trackTitle, fileSizeMb, loadFile, togglePlay } =
+  useAudioPlayer()
+
 const selectedVisualizer = ref('bars')
 
-const visualizers = [
-  { value: 'bars', label: 'Спектр (столбцы)' },
-  { value: 'wave', label: 'Осциллограф (волна)' },
-  { value: 'circle', label: 'Круговой спектр' },
-  { value: 'particles', label: 'Частицы' },
-]
+// Пустышки удалены — пока один реальный визуализатор
+const visualizers = [{ value: 'bars', label: 'Спектр (столбцы)' }]
 
-// Состояние плеера
-const audio = new Audio()
 const fileInput = ref<HTMLInputElement | null>(null)
-
-const trackTitle = ref('Файл не выбран')
-const fileSizeMb = ref<string | null>(null)
-const currentTime = ref(0)
-const duration = ref(0)
-
-let objectUrl: string | null = null
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds)) return '00:00'
   const m = Math.floor(seconds / 60)
   const s = Math.floor(seconds % 60)
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-}
-
-function togglePlay() {
-  if (!audio.src) return
-  if (isPlaying.value) {
-    audio.pause()
-  } else {
-    audio.play()
-  }
 }
 
 function chooseFile() {
@@ -46,47 +27,14 @@ function onFileSelected(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
-
-  // Освобождаем предыдущий URL, если был
-  if (objectUrl) {
-    URL.revokeObjectURL(objectUrl)
-  }
-
-  objectUrl = URL.createObjectURL(file)
-  audio.src = objectUrl
-
-  // Имя файла без расширения — как временное название трека
-  trackTitle.value = file.name.replace(/\.[^/.]+$/, '')
-  fileSizeMb.value = (file.size / (1024 * 1024)).toFixed(2)
-
-  audio.play()
-
-  // Сбрасываем input, чтобы можно было повторно выбрать тот же файл
+  loadFile(file)
   input.value = ''
 }
 
-audio.addEventListener('play', () => {
-  isPlaying.value = true
-})
-audio.addEventListener('pause', () => {
-  isPlaying.value = false
-})
-audio.addEventListener('ended', () => {
-  isPlaying.value = false
-})
-audio.addEventListener('timeupdate', () => {
-  currentTime.value = audio.currentTime
-})
-audio.addEventListener('loadedmetadata', () => {
-  duration.value = audio.duration
-})
-
-onBeforeUnmount(() => {
-  audio.pause()
-  if (objectUrl) {
-    URL.revokeObjectURL(objectUrl)
-  }
-})
+function openFullscreen() {
+  const stage = document.getElementById('visualizer-stage')
+  stage?.requestFullscreen()
+}
 </script>
 
 <template>
@@ -135,6 +83,17 @@ onBeforeUnmount(() => {
           </option>
         </select>
       </div>
+
+      <div class="cell">
+        <button
+          class="btn btn-icon"
+          type="button"
+          title="Открыть на весь экран"
+          @click="openFullscreen"
+        >
+          ⛶
+        </button>
+      </div>
     </div>
 
     <div class="row row-2">
@@ -169,7 +128,7 @@ onBeforeUnmount(() => {
 }
 
 .row-1 {
-  grid-template-columns: auto auto auto;
+  grid-template-columns: auto auto auto auto;
   justify-content: center;
   padding: 8px 12px;
   gap: 20px;
