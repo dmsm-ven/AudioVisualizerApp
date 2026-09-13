@@ -1,14 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useAudioPlayer } from '../composables/useAudioPlayer'
+import { useVisualizerSelection } from '../composables/useVisualizerSelection'
 
 const { isPlaying, currentTime, duration, trackTitle, fileSizeMb, loadFile, togglePlay } =
   useAudioPlayer()
 
-const selectedVisualizer = ref('bars')
-
-// Пустышки удалены — пока один реальный визуализатор
-const visualizers = [{ value: 'bars', label: 'Спектр (столбцы)' }]
+const { visualizers, selectedVisualizer } = useVisualizerSelection()
 
 const fileInput = ref<HTMLInputElement | null>(null)
 
