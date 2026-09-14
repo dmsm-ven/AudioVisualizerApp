@@ -26,8 +26,8 @@ declare module 'butterchurn' {
 }
 
 declare module 'butterchurn-presets' {
-  const butterchurnPresets: {
-    getPresets(): Record<string, unknown>
-  }
-  export default butterchurnPresets
+  // The package's default export IS the presets-map factory function itself
+  // (not an object with a getPresets method).
+  const getPresets: () => Record<string, unknown>
+  export default getPresets
 }

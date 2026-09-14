@@ -62,7 +62,7 @@ function tryInitVisualizer() {
         textureRatio: 1,
       })
 
-      presetsMap = presetsMod.default.getPresets()
+      presetsMap = presetsMod.default()
       presetKeys = Object.keys(presetsMap)
 
       visualizer.connectAudio(analyser)
