@@ -1,9 +1,16 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref } from 'vue'
+import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import type ButterchurnModule from 'butterchurn'
 import { useAudioPlayer } from '../composables/useAudioPlayer'
+import { useButterchurnSettings } from '../composables/useButterchurnSettings'
 
 const { getAnalyser, getAudioContext } = useAudioPlayer()
+const {
+  presetKeys: presetKeysShared,
+  isRandomOrder,
+  selectedPresetKey,
+  currentPresetKey,
+} = useButterchurnSettings()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 
@@ -24,13 +31,51 @@ const PRESET_BLEND_SECONDS = 2.7
 let presetKeys: string[] = []
 let presetsMap: Record<string, unknown> = {}
 
+function loadPresetByKey(key: string) {
+  if (!visualizer || !presetsMap[key]) return
+  visualizer.loadPreset(presetsMap[key], PRESET_BLEND_SECONDS)
+  currentPresetKey.value = key
+}
+
 function pickRandomPreset() {
   if (!visualizer || presetKeys.length === 0) return
   const key = presetKeys[Math.floor(Math.random() * presetKeys.length)]
   if (key) {
-    visualizer.loadPreset(presetsMap[key], PRESET_BLEND_SECONDS)
+    loadPresetByKey(key)
   }
 }
+
+function startRandomCycle() {
+  stopRandomCycle()
+  pickRandomPreset()
+  presetCycleInterval = setInterval(pickRandomPreset, PRESET_CYCLE_SECONDS * 1000)
+}
+
+function stopRandomCycle() {
+  if (presetCycleInterval) {
+    clearInterval(presetCycleInterval)
+    presetCycleInterval = null
+  }
+}
+
+// Переключение режима "случайный порядок" <-> "конкретный пресет"
+watch(isRandomOrder, (random) => {
+  if (!visualizer) return
+  if (random) {
+    startRandomCycle()
+  } else {
+    stopRandomCycle()
+    if (selectedPresetKey.value) {
+      loadPresetByKey(selectedPresetKey.value)
+    }
+  }
+})
+
+// Выбор конкретного пресета из панели настроек (применяется сразу, если режим не случайный)
+watch(selectedPresetKey, (key) => {
+  if (!visualizer || !key || isRandomOrder.value) return
+  loadPresetByKey(key)
+})
 
 // Разные версии Vite/Rollup по-разному "разворачивают" default-экспорт
 // у CJS/UMD-пакетов. Проверяем, есть ли искомое свойство на самом
@@ -97,15 +142,23 @@ function tryInitVisualizer() {
       })
 
       presetsMap = presetsCtor.getPresets()
-      presetKeys = Object.keys(presetsMap)
+      presetKeys = Object.keys(presetsMap).sort((a, b) => a.localeCompare(b))
+      presetKeysShared.value = presetKeys
 
       visualizer.connectAudio(analyser)
       connectedNode = analyser
 
       resizeCanvas()
-      pickRandomPreset()
 
-      presetCycleInterval = setInterval(pickRandomPreset, PRESET_CYCLE_SECONDS * 1000)
+      if (isRandomOrder.value) {
+        startRandomCycle()
+      } else if (selectedPresetKey.value) {
+        loadPresetByKey(selectedPresetKey.value)
+      } else {
+        // Ничего не выбрано вручную и режим не случайный — всё равно
+        // нужно показать хоть что-то по умолчанию.
+        pickRandomPreset()
+      }
     })
     .catch((err) => {
       initFailed = true
@@ -148,9 +201,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   cancelAnimationFrame(animationFrameId)
   resizeObserver?.disconnect()
-  if (presetCycleInterval) {
-    clearInterval(presetCycleInterval)
-  }
+  stopRandomCycle()
 })
 </script>
 
