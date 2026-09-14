@@ -16,6 +16,7 @@ let animationFrameId = 0
 let resizeObserver: ResizeObserver | null = null
 let presetCycleInterval: ReturnType<typeof setInterval> | null = null
 let isLoadingLibrary = false
+let initFailed = false
 
 const PRESET_CYCLE_SECONDS = 20
 const PRESET_BLEND_SECONDS = 2.7
@@ -31,6 +32,24 @@ function pickRandomPreset() {
   }
 }
 
+// Разные версии Vite/Rollup по-разному "разворачивают" default-экспорт
+// у CJS/UMD-пакетов. Проверяем, есть ли искомое свойство на самом
+// объекте, а если нет — пробуем на вложенном .default.
+function unwrapCjsExport<T extends object>(
+  moduleDefault: unknown,
+  probeKey: keyof T,
+): T | null {
+  const candidate = moduleDefault as (T & { default?: unknown }) | null | undefined
+  if (candidate && typeof candidate[probeKey] === 'function') {
+    return candidate as T
+  }
+  const nested = candidate?.default as T | undefined
+  if (nested && typeof nested[probeKey] === 'function') {
+    return nested
+  }
+  return null
+}
+
 function resizeCanvas() {
   const canvas = canvasRef.value
   if (!canvas || !visualizer) return
@@ -42,7 +61,7 @@ function resizeCanvas() {
 }
 
 function tryInitVisualizer() {
-  if (visualizer || isLoadingLibrary) return
+  if (visualizer || isLoadingLibrary || initFailed) return
   const canvas = canvasRef.value
   const audioContext = getAudioContext()
   const analyser = getAnalyser()
@@ -52,8 +71,23 @@ function tryInitVisualizer() {
 
   Promise.all([import('butterchurn'), import('butterchurn-presets')])
     .then(([butterchurnMod, presetsMod]) => {
-      butterchurn = butterchurnMod.default
-      if (!canvas || !butterchurn) return
+      butterchurn = unwrapCjsExport<typeof ButterchurnModule>(
+        butterchurnMod.default,
+        'createVisualizer',
+      )
+      const presetsCtor = unwrapCjsExport<{ getPresets(): Record<string, unknown> }>(
+        presetsMod.default,
+        'getPresets',
+      )
+
+      if (!canvas || !butterchurn || !presetsCtor) {
+        initFailed = true
+        console.error('Butterchurn: could not resolve library exports', {
+          butterchurnMod,
+          presetsMod,
+        })
+        return
+      }
 
       visualizer = butterchurn.createVisualizer(audioContext, canvas, {
         width: canvas.clientWidth || 800,
@@ -62,7 +96,7 @@ function tryInitVisualizer() {
         textureRatio: 1,
       })
 
-      presetsMap = presetsMod.default()
+      presetsMap = presetsCtor.getPresets()
       presetKeys = Object.keys(presetsMap)
 
       visualizer.connectAudio(analyser)
@@ -72,6 +106,10 @@ function tryInitVisualizer() {
       pickRandomPreset()
 
       presetCycleInterval = setInterval(pickRandomPreset, PRESET_CYCLE_SECONDS * 1000)
+    })
+    .catch((err) => {
+      initFailed = true
+      console.error('Butterchurn: failed to initialize visualizer', err)
     })
     .finally(() => {
       isLoadingLibrary = false
