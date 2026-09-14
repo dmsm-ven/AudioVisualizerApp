@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { onMounted, onBeforeUnmount, ref, watch, watchEffect } from 'vue'
 import type ButterchurnModule from 'butterchurn'
 import { useAudioPlayer } from '../composables/useAudioPlayer'
 import { useButterchurnSettings } from '../composables/useButterchurnSettings'
+import { buildFilterCss } from '../composables/useCanvasFilters'
 
 const { getAnalyser, getAudioContext } = useAudioPlayer()
 const {
   presetKeys: presetKeysShared,
   isRandomOrder,
+  presetCycleSeconds,
   selectedPresetKey,
   currentPresetKey,
 } = useButterchurnSettings()
@@ -25,7 +27,6 @@ let presetCycleInterval: ReturnType<typeof setInterval> | null = null
 let isLoadingLibrary = false
 let initFailed = false
 
-const PRESET_CYCLE_SECONDS = 20
 const PRESET_BLEND_SECONDS = 2.7
 
 let presetKeys: string[] = []
@@ -48,7 +49,7 @@ function pickRandomPreset() {
 function startRandomCycle() {
   stopRandomCycle()
   pickRandomPreset()
-  presetCycleInterval = setInterval(pickRandomPreset, PRESET_CYCLE_SECONDS * 1000)
+  presetCycleInterval = setInterval(pickRandomPreset, presetCycleSeconds.value * 1000)
 }
 
 function stopRandomCycle() {
@@ -75,6 +76,21 @@ watch(isRandomOrder, (random) => {
 watch(selectedPresetKey, (key) => {
   if (!visualizer || !key || isRandomOrder.value) return
   loadPresetByKey(key)
+})
+
+// Изменение интервала автосмены — перезапускаем таймер с новым значением
+watch(presetCycleSeconds, () => {
+  if (visualizer && isRandomOrder.value) {
+    startRandomCycle()
+  }
+})
+
+// Применение выбранных CSS-фильтров к canvas (стандартное свойство `filter`)
+watchEffect(() => {
+  const css = buildFilterCss()
+  if (canvasRef.value) {
+    canvasRef.value.style.filter = css
+  }
 })
 
 // Разные версии Vite/Rollup по-разному "разворачивают" default-экспорт
@@ -229,5 +245,6 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   display: block;
+  transition: filter 0.15s ease;
 }
 </style>
