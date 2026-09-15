@@ -3,7 +3,9 @@ import { onMounted, onBeforeUnmount, ref, watch, watchEffect } from 'vue'
 import type ButterchurnModule from 'butterchurn'
 import { useAudioPlayer } from '../composables/useAudioPlayer'
 import { useButterchurnSettings } from '../composables/useButterchurnSettings'
+import { useVisualizerSelection } from '../composables/useVisualizerSelection'
 import { buildFilterCss } from '../composables/useCanvasFilters'
+import { createGlassRainEffect } from '../visualizers/glassRain'
 
 const { getAnalyser, getAudioContext } = useAudioPlayer()
 const {
@@ -13,16 +15,53 @@ const {
   selectedPresetKey,
   currentPresetKey,
 } = useButterchurnSettings()
+const { selectedVisualizer } = useVisualizerSelection()
 
-const canvasRef = ref<HTMLCanvasElement | null>(null)
+const stageRef = ref<HTMLElement | null>(null)
+const butterchurnCanvasRef = ref<HTMLCanvasElement | null>(null)
+const customCanvasRef = ref<HTMLCanvasElement | null>(null)
+
+const CUSTOM_PRESET_NAME = 'painven - glass rain 1'
+
+/* ---------- Общее ---------- */
+
+let animationFrameId = 0
+let resizeObserver: ResizeObserver | null = null
+
+function resizeCanvases() {
+  const stage = stageRef.value
+  if (!stage) return
+  const width = stage.clientWidth
+  const height = stage.clientHeight
+
+  const bcCanvas = butterchurnCanvasRef.value
+  if (bcCanvas) {
+    bcCanvas.width = width
+    bcCanvas.height = height
+    visualizer?.setRendererSize(width, height)
+  }
+
+  const customCanvas = customCanvasRef.value
+  if (customCanvas) {
+    customCanvas.width = width
+    customCanvas.height = height
+  }
+}
+
+// Применение выбранных CSS-фильтров к активному canvas (свойство `filter`)
+watchEffect(() => {
+  const css = buildFilterCss()
+  if (butterchurnCanvasRef.value) butterchurnCanvasRef.value.style.filter = css
+  if (customCanvasRef.value) customCanvasRef.value.style.filter = css
+})
+
+/* ---------- Butterchurn (MilkDrop) ---------- */
 
 type Visualizer = ReturnType<typeof ButterchurnModule.createVisualizer>
 
 let butterchurn: typeof ButterchurnModule | null = null
 let visualizer: Visualizer | null = null
 let connectedNode: AudioNode | null = null
-let animationFrameId = 0
-let resizeObserver: ResizeObserver | null = null
 let presetCycleInterval: ReturnType<typeof setInterval> | null = null
 let isLoadingLibrary = false
 let initFailed = false
@@ -59,7 +98,6 @@ function stopRandomCycle() {
   }
 }
 
-// Переключение режима "случайный порядок" <-> "конкретный пресет"
 watch(isRandomOrder, (random) => {
   if (!visualizer) return
   if (random) {
@@ -72,24 +110,14 @@ watch(isRandomOrder, (random) => {
   }
 })
 
-// Выбор конкретного пресета из панели настроек (применяется сразу, если режим не случайный)
 watch(selectedPresetKey, (key) => {
   if (!visualizer || !key || isRandomOrder.value) return
   loadPresetByKey(key)
 })
 
-// Изменение интервала автосмены — перезапускаем таймер с новым значением
 watch(presetCycleSeconds, () => {
   if (visualizer && isRandomOrder.value) {
     startRandomCycle()
-  }
-})
-
-// Применение выбранных CSS-фильтров к canvas (стандартное свойство `filter`)
-watchEffect(() => {
-  const css = buildFilterCss()
-  if (canvasRef.value) {
-    canvasRef.value.style.filter = css
   }
 })
 
@@ -111,19 +139,9 @@ function unwrapCjsExport<T extends object>(
   return null
 }
 
-function resizeCanvas() {
-  const canvas = canvasRef.value
-  if (!canvas || !visualizer) return
-  const width = canvas.clientWidth
-  const height = canvas.clientHeight
-  canvas.width = width
-  canvas.height = height
-  visualizer.setRendererSize(width, height)
-}
-
-function tryInitVisualizer() {
+function tryInitButterchurn() {
   if (visualizer || isLoadingLibrary || initFailed) return
-  const canvas = canvasRef.value
+  const canvas = butterchurnCanvasRef.value
   const audioContext = getAudioContext()
   const analyser = getAnalyser()
   if (!canvas || !audioContext || !analyser) return
@@ -164,15 +182,13 @@ function tryInitVisualizer() {
       visualizer.connectAudio(analyser)
       connectedNode = analyser
 
-      resizeCanvas()
+      resizeCanvases()
 
       if (isRandomOrder.value) {
         startRandomCycle()
       } else if (selectedPresetKey.value) {
         loadPresetByKey(selectedPresetKey.value)
       } else {
-        // Ничего не выбрано вручную и режим не случайный — всё равно
-        // нужно показать хоть что-то по умолчанию.
         pickRandomPreset()
       }
     })
@@ -185,32 +201,57 @@ function tryInitVisualizer() {
     })
 }
 
-function renderLoop() {
-  // Аудиограф создаётся лениво (после выбора файла) — пробуем инициализировать
-  // визуализатор на каждом кадре, пока он ещё не создан.
-  if (!visualizer) {
-    tryInitVisualizer()
-  }
+/* ---------- Custom: "painven - glass rain 1" ---------- */
 
-  // Если узел-источник сменился (например, граф был пересоздан), переподключаемся
+const glassRain = createGlassRainEffect()
+
+function renderGlassRain() {
+  const canvas = customCanvasRef.value
   const analyser = getAnalyser()
-  if (visualizer && analyser && analyser !== connectedNode) {
-    visualizer.connectAudio(analyser)
-    connectedNode = analyser
+  const ctx = canvas?.getContext('2d')
+  if (!canvas || !ctx) return
+
+  currentPresetKey.value = CUSTOM_PRESET_NAME
+
+  if (!analyser) {
+    ctx.fillStyle = '#000'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    return
   }
 
-  if (visualizer) {
-    visualizer.render()
+  const freqData = new Uint8Array(analyser.frequencyBinCount)
+  analyser.getByteFrequencyData(freqData)
+  glassRain.draw(ctx, canvas, freqData)
+}
+
+/* ---------- Общий цикл рендера ---------- */
+
+function renderLoop() {
+  if (selectedVisualizer.value === 'butterchurn') {
+    if (!visualizer) {
+      tryInitButterchurn()
+    }
+    const analyser = getAnalyser()
+    if (visualizer && analyser && analyser !== connectedNode) {
+      visualizer.connectAudio(analyser)
+      connectedNode = analyser
+    }
+    if (visualizer) {
+      visualizer.render()
+    }
+  } else if (selectedVisualizer.value === 'custom-glass-rain') {
+    renderGlassRain()
   }
 
   animationFrameId = requestAnimationFrame(renderLoop)
 }
 
 onMounted(() => {
-  if (canvasRef.value) {
-    resizeObserver = new ResizeObserver(resizeCanvas)
-    resizeObserver.observe(canvasRef.value)
+  if (stageRef.value) {
+    resizeObserver = new ResizeObserver(resizeCanvases)
+    resizeObserver.observe(stageRef.value)
   }
+  resizeCanvases()
   renderLoop()
 })
 
@@ -222,15 +263,24 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main id="visualizer-stage" class="stage">
-    <canvas ref="canvasRef" class="canvas"></canvas>
+  <main id="visualizer-stage" ref="stageRef" class="stage">
+    <canvas
+      ref="butterchurnCanvasRef"
+      class="canvas"
+      v-show="selectedVisualizer === 'butterchurn'"
+    ></canvas>
+    <canvas
+      ref="customCanvasRef"
+      class="canvas"
+      v-show="selectedVisualizer === 'custom-glass-rain'"
+    ></canvas>
   </main>
 </template>
 
 <style scoped>
 .stage {
+  position: relative;
   flex: 1;
-  display: flex;
   background: #000;
   min-height: 0;
 }
@@ -242,6 +292,8 @@ onBeforeUnmount(() => {
 }
 
 .canvas {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;
