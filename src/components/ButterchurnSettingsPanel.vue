@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useButterchurnSettings } from '../composables/useButterchurnSettings'
-import { filterDefs, useCanvasFilters } from '../composables/useCanvasFilters'
+import { useButterchurnSettings } from "../composables/useButterchurnSettings";
+import { filterDefs, useCanvasFilters } from "../composables/useCanvasFilters";
 
 const {
   presetKeys,
@@ -8,9 +8,9 @@ const {
   presetCycleSeconds,
   selectedPresetKey,
   currentPresetKey,
-} = useButterchurnSettings()
+} = useButterchurnSettings();
 
-const { enabledMap, valueMap } = useCanvasFilters()
+const { enabledMap, valueMap } = useCanvasFilters();
 </script>
 
 <template>
@@ -24,7 +24,8 @@ const { enabledMap, valueMap } = useCanvasFilters()
 
     <div class="field">
       <label class="field-label" for="cycle-length">
-        Смена пресета каждые: <span class="field-value">{{ presetCycleSeconds }} сек</span>
+        Смена пресета каждые:
+        <span class="field-value">{{ presetCycleSeconds }} сек</span>
       </label>
       <input
         id="cycle-length"
@@ -44,7 +45,9 @@ const { enabledMap, valueMap } = useCanvasFilters()
       class="preset-select"
       :disabled="isRandomOrder || presetKeys.length === 0"
     >
-      <option v-if="presetKeys.length === 0" value="" disabled>Загрузка пресетов…</option>
+      <option v-if="presetKeys.length === 0" value="" disabled>
+        Загрузка пресетов…
+      </option>
       <option v-for="key in presetKeys" :key="key" :value="key">
         {{ key }}
       </option>
@@ -70,7 +73,9 @@ const { enabledMap, valueMap } = useCanvasFilters()
           v-model.number="valueMap[filter.key]"
           :disabled="!enabledMap[filter.key]"
         />
-        <span class="filter-value">{{ valueMap[filter.key] }}{{ filter.unit }}</span>
+        <span class="filter-value"
+          >{{ valueMap[filter.key] }}{{ filter.unit }}</span
+        >
       </div>
     </div>
   </div>
@@ -92,7 +97,7 @@ const { enabledMap, valueMap } = useCanvasFilters()
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   z-index: 20;
   color: #e6e6e6;
-  font-family: 'Segoe UI', sans-serif;
+  font-family: "Segoe UI", sans-serif;
   font-size: 0.85rem;
 }
 
@@ -178,6 +183,7 @@ const { enabledMap, valueMap } = useCanvasFilters()
 .filter-toggle {
   display: flex;
   align-items: center;
+  text-wrap: nowrap;
   gap: 6px;
   cursor: pointer;
   user-select: none;
