@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useAudioPlayer } from '../composables/useAudioPlayer'
 import { useVisualizerSelection } from '../composables/useVisualizerSelection'
+import { usePlaylist } from '../composables/usePlaylist'
 import ButterchurnSettingsPanel from './ButterchurnSettingsPanel.vue'
 
 const {
@@ -14,9 +15,12 @@ const {
   loadFile,
   togglePlay,
   seekTo,
+  onTrackEnded,
 } = useAudioPlayer()
 
 const { visualizers, selectedVisualizer } = useVisualizerSelection()
+
+const { currentTrack, hasPrev, hasNext, setTracksFromFileList, next, prev } = usePlaylist()
 
 const fileInput = ref<HTMLInputElement | null>(null)
 const showSettings = ref(false)
@@ -28,17 +32,43 @@ function formatTime(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
+function playCurrentTrack() {
+  if (currentTrack.value) {
+    loadFile(currentTrack.value.file)
+  }
+}
+
 function chooseFile() {
   fileInput.value?.click()
 }
 
+// Выбирается целиком папка (браузеры не дают доступа к "соседним" файлам
+// одного выбранного файла — только через явный выбор директории).
 function onFileSelected(event: Event) {
   const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-  loadFile(file)
+  const files = input.files
+  if (!files || files.length === 0) return
+  setTracksFromFileList(files)
+  playCurrentTrack()
   input.value = ''
 }
+
+function playNext() {
+  next()
+  playCurrentTrack()
+}
+
+function playPrev() {
+  prev()
+  playCurrentTrack()
+}
+
+// Автопереход к следующему треку по завершении текущего
+onTrackEnded(() => {
+  if (hasNext.value) {
+    playNext()
+  }
+})
 
 function openFullscreen() {
   const stage = document.getElementById('visualizer-stage')
@@ -60,6 +90,15 @@ function toggleSettings() {
     <div class="row row-1">
       <div class="cell cell-transport">
         <button
+          class="btn btn-small prev-btn"
+          type="button"
+          :disabled="!hasPrev"
+          title="Предыдущий трек"
+          @click="playPrev"
+        >
+          ⏮
+        </button>
+        <button
           class="btn btn-small play-btn"
           type="button"
           :disabled="!fileSizeMb || isPlaying"
@@ -75,16 +114,27 @@ function toggleSettings() {
         >
           ⏹
         </button>
+        <button
+          class="btn btn-small next-btn"
+          type="button"
+          :disabled="!hasNext"
+          title="Следующий трек"
+          @click="playNext"
+        >
+          ⏭
+        </button>
       </div>
 
       <div class="cell cell-file">
-        <button class="btn btn-icon" type="button" title="Выбрать файл" @click="chooseFile">
+        <button class="btn btn-icon" type="button" title="Выбрать папку с треками" @click="chooseFile">
           📂
         </button>
         <input
           ref="fileInput"
           type="file"
-          accept="audio/mpeg,audio/mp4,.mp3,.m4a"
+          webkitdirectory
+          directory
+          multiple
           class="hidden-input"
           @change="onFileSelected"
         />

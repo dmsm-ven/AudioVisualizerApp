@@ -77,6 +77,12 @@ watch(volumePercent, (percent) => {
   audio.volume = percentToLinearVolume(percent)
 })
 
+const endedCallbacks: Array<() => void> = []
+
+function onTrackEnded(callback: () => void) {
+  endedCallbacks.push(callback)
+}
+
 audio.addEventListener('play', () => {
   isPlaying.value = true
 })
@@ -85,6 +91,7 @@ audio.addEventListener('pause', () => {
 })
 audio.addEventListener('ended', () => {
   isPlaying.value = false
+  endedCallbacks.forEach((cb) => cb())
 })
 audio.addEventListener('timeupdate', () => {
   currentTime.value = audio.currentTime
@@ -104,6 +111,7 @@ export function useAudioPlayer() {
     loadFile,
     togglePlay,
     seekTo,
+    onTrackEnded,
     getAnalyser: () => analyser,
     getAudioContext: () => audioContext,
   }
