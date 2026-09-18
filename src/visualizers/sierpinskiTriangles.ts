@@ -116,8 +116,12 @@ export function createSierpinskiEffect() {
 
     bassHistory.push(bass)
     if (bassHistory.length > BASS_HISTORY_LENGTH) bassHistory.shift()
-    const avgBass = bassHistory.reduce((a, b) => a + b, 0) / (bassHistory.length || 1)
-    const isBeat = bass > avgBass * 1.3 && bass > 0.28
+    // Среднее считаем БЕЗ текущего сэмпла — иначе резкий всплеск сам
+    // немного "подмешивается" в среднее и глушит собственную детекцию.
+    const priorHistory = bassHistory.slice(0, -1)
+    const avgBass =
+      priorHistory.length > 0 ? priorHistory.reduce((a, b) => a + b, 0) / priorHistory.length : bass
+    const isBeat = bass > avgBass * 1.25 && bass > 0.25
 
     // Фон — чёрный
     ctx.fillStyle = '#000'
@@ -133,7 +137,15 @@ export function createSierpinskiEffect() {
     const coreVerts = trianglePoints(canvas.width / 2, canvas.height / 2, coreSize, coreRotation)
     drawSierpinski(ctx, coreVerts[0], coreVerts[1], coreVerts[2], coreDepth, 0, coreDepth, 0.9)
 
-    // Новый треугольник случайного размера при ударе баса
+    // Новые треугольники появляются постоянно — вероятность спавна растёт
+    // вместе с общей громкостью (а не только по резким ударам баса,
+    // которые в обычном плавном звучании трека случаются гораздо реже,
+    // чем кажется). Явный удар баса добавляет гарантированный "бонусный"
+    // экземпляр поверх фонового потока.
+    const backgroundSpawnChance = 0.03 + overall * 0.22
+    if (Math.random() < backgroundSpawnChance) {
+      spawnInstance(canvas, overall)
+    }
     if (isBeat) {
       spawnInstance(canvas, overall)
     }
