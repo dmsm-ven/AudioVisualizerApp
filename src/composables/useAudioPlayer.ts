@@ -41,7 +41,9 @@ function ensureAudioGraph() {
   }
 }
 
-function loadFile(file: File) {
+function loadFile(file: File, options: { autoplay?: boolean } = {}) {
+  const { autoplay = true } = options
+
   if (objectUrl) {
     URL.revokeObjectURL(objectUrl)
   }
@@ -53,7 +55,9 @@ function loadFile(file: File) {
 
   ensureAudioGraph()
   audioContext?.resume()
-  audio.play()
+  if (autoplay) {
+    audio.play()
+  }
 }
 
 function togglePlay() {
@@ -70,6 +74,20 @@ function togglePlay() {
 function seekTo(seconds: number) {
   if (!audio.src || !Number.isFinite(seconds)) return
   audio.currentTime = Math.min(Math.max(seconds, 0), duration.value || seconds)
+}
+
+/** Установить позицию, как только у аудио появятся метаданные (для восстановления сессии). */
+function seekOnceReady(seconds: number) {
+  if (audio.readyState >= 1) {
+    // HAVE_METADATA уже достигнут
+    audio.currentTime = seconds
+    return
+  }
+  const handler = () => {
+    audio.currentTime = seconds
+    audio.removeEventListener('loadedmetadata', handler)
+  }
+  audio.addEventListener('loadedmetadata', handler)
 }
 
 audio.volume = percentToLinearVolume(volumePercent.value)
@@ -111,6 +129,7 @@ export function useAudioPlayer() {
     loadFile,
     togglePlay,
     seekTo,
+    seekOnceReady,
     onTrackEnded,
     getAnalyser: () => analyser,
     getAudioContext: () => audioContext,

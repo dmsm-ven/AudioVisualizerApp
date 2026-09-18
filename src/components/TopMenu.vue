@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useAudioPlayer } from '../composables/useAudioPlayer'
 import { useVisualizerSelection } from '../composables/useVisualizerSelection'
 import { usePlaylist } from '../composables/usePlaylist'
+import { supportsFileSystemAccess, rememberDirectory } from '../composables/useAppPersistence'
 import VisualizerSettingsPanel from './VisualizerSettingsPanel.vue'
 
 const {
@@ -20,7 +21,8 @@ const {
 
 const { visualizers, selectedVisualizer } = useVisualizerSelection()
 
-const { currentTrack, hasPrev, hasNext, setTracksFromFileList, next, prev } = usePlaylist()
+const { currentTrack, hasPrev, hasNext, setTracksFromFileList, setTracksFromDirectoryHandle, next, prev } =
+  usePlaylist()
 
 const fileInput = ref<HTMLInputElement | null>(null)
 const showSettings = ref(false)
@@ -38,7 +40,25 @@ function playCurrentTrack() {
   }
 }
 
-function chooseFile() {
+// Там, где доступен File System Access API (Chrome/Edge), используем его —
+// это позволяет запомнить папку и при следующем запуске предложить
+// восстановить сессию без повторного выбора через системный диалог.
+// В остальных браузерах (Firefox/Safari) — запасной вариант через
+// обычный <input webkitdirectory>, без автовосстановления папки.
+async function chooseFile() {
+  if (supportsFileSystemAccess) {
+    try {
+      const handle = await window.showDirectoryPicker!({ mode: 'read' })
+      await setTracksFromDirectoryHandle(handle)
+      await rememberDirectory(handle)
+      playCurrentTrack()
+    } catch (err) {
+      if ((err as DOMException)?.name !== 'AbortError') {
+        console.error('Не удалось открыть папку', err)
+      }
+    }
+    return
+  }
   fileInput.value?.click()
 }
 

@@ -38,10 +38,40 @@ function setTracksFromFileList(fileList: FileList) {
   currentIndex.value = tracks.value.length > 0 ? 0 : -1
 }
 
+/**
+ * Строит плейлист напрямую из FileSystemDirectoryHandle (File System Access
+ * API) — используется и при ручном выборе папки, и при автоматическом
+ * восстановлении последней сессии.
+ */
+async function setTracksFromDirectoryHandle(handle: FileSystemDirectoryHandle) {
+  const found: PlaylistTrack[] = []
+  for await (const [name, entryHandle] of handle.entries()) {
+    if (entryHandle.kind === 'file' && AUDIO_EXTENSION_RE.test(name)) {
+      const file = await (entryHandle as FileSystemFileHandle).getFile()
+      found.push({ name, file })
+    }
+  }
+
+  found.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
+
+  tracks.value = found
+  currentIndex.value = found.length > 0 ? 0 : -1
+}
+
 function selectIndex(index: number) {
   if (index >= 0 && index < tracks.value.length) {
     currentIndex.value = index
   }
+}
+
+/** Выбрать трек по имени файла (используется при восстановлении сессии). Возвращает true, если трек найден. */
+function selectIndexByName(name: string): boolean {
+  const index = tracks.value.findIndex((track) => track.name === name)
+  if (index >= 0) {
+    currentIndex.value = index
+    return true
+  }
+  return false
 }
 
 function next() {
@@ -60,7 +90,9 @@ export function usePlaylist() {
     hasPrev,
     hasNext,
     setTracksFromFileList,
+    setTracksFromDirectoryHandle,
     selectIndex,
+    selectIndexByName,
     next,
     prev,
   }
