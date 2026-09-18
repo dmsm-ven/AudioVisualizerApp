@@ -5,7 +5,9 @@ import { useAudioPlayer } from '../composables/useAudioPlayer'
 import { useButterchurnSettings } from '../composables/useButterchurnSettings'
 import { useVisualizerSelection } from '../composables/useVisualizerSelection'
 import { buildFilterCss } from '../composables/useCanvasFilters'
+import { useCustomPresetSettings } from '../composables/useCustomPresetSettings'
 import { createGlassRainEffect } from '../visualizers/glassRain'
+import { createSierpinskiEffect } from '../visualizers/sierpinskiTriangles'
 
 const { getAnalyser, getAudioContext } = useAudioPlayer()
 const {
@@ -16,12 +18,11 @@ const {
   currentPresetKey,
 } = useButterchurnSettings()
 const { selectedVisualizer } = useVisualizerSelection()
+const { selectedCustomPreset } = useCustomPresetSettings()
 
 const stageRef = ref<HTMLElement | null>(null)
 const butterchurnCanvasRef = ref<HTMLCanvasElement | null>(null)
 const customCanvasRef = ref<HTMLCanvasElement | null>(null)
-
-const CUSTOM_PRESET_NAME = 'painven - glass rain 1'
 
 /* ---------- Общее ---------- */
 
@@ -201,17 +202,18 @@ function tryInitButterchurn() {
     })
 }
 
-/* ---------- Custom: "painven - glass rain 1" ---------- */
+/* ---------- Custom: "Glass Rain" / "Triangles" ---------- */
 
 const glassRain = createGlassRainEffect()
+const sierpinski = createSierpinskiEffect()
 
-function renderGlassRain() {
+function renderCustom() {
   const canvas = customCanvasRef.value
   const analyser = getAnalyser()
   const ctx = canvas?.getContext('2d')
   if (!canvas || !ctx) return
 
-  currentPresetKey.value = CUSTOM_PRESET_NAME
+  currentPresetKey.value = selectedCustomPreset.value
 
   if (!analyser) {
     ctx.fillStyle = '#000'
@@ -221,7 +223,12 @@ function renderGlassRain() {
 
   const freqData = new Uint8Array(analyser.frequencyBinCount)
   analyser.getByteFrequencyData(freqData)
-  glassRain.draw(ctx, canvas, freqData)
+
+  if (selectedCustomPreset.value === 'triangles') {
+    sierpinski.draw(ctx, canvas, freqData)
+  } else {
+    glassRain.draw(ctx, canvas, freqData)
+  }
 }
 
 /* ---------- Общий цикл рендера ---------- */
@@ -239,8 +246,8 @@ function renderLoop() {
     if (visualizer) {
       visualizer.render()
     }
-  } else if (selectedVisualizer.value === 'custom-glass-rain') {
-    renderGlassRain()
+  } else if (selectedVisualizer.value === 'custom') {
+    renderCustom()
   }
 
   animationFrameId = requestAnimationFrame(renderLoop)
@@ -272,7 +279,7 @@ onBeforeUnmount(() => {
     <canvas
       ref="customCanvasRef"
       class="canvas"
-      v-show="selectedVisualizer === 'custom-glass-rain'"
+      v-show="selectedVisualizer === 'custom'"
     ></canvas>
   </main>
 </template>

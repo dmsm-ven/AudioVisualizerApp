@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { useButterchurnSettings } from "../composables/useButterchurnSettings";
-import { filterDefs, useCanvasFilters } from "../composables/useCanvasFilters";
+import { useButterchurnSettings } from '../composables/useButterchurnSettings'
+import { filterDefs, useCanvasFilters } from '../composables/useCanvasFilters'
+import { useVisualizerSelection } from '../composables/useVisualizerSelection'
+import { useCustomPresetSettings } from '../composables/useCustomPresetSettings'
+
+const { selectedVisualizer } = useVisualizerSelection()
 
 const {
   presetKeys,
@@ -8,50 +12,60 @@ const {
   presetCycleSeconds,
   selectedPresetKey,
   currentPresetKey,
-} = useButterchurnSettings();
+} = useButterchurnSettings()
 
-const { enabledMap, valueMap } = useCanvasFilters();
+const { customPresets, selectedCustomPreset } = useCustomPresetSettings()
+
+const { enabledMap, valueMap } = useCanvasFilters()
 </script>
 
 <template>
   <div class="settings-panel">
     <div class="settings-title">Настройки визуализации</div>
 
-    <label class="random-toggle">
-      <input type="checkbox" v-model="isRandomOrder" />
-      Случайный порядок
-    </label>
-
-    <div class="field">
-      <label class="field-label" for="cycle-length">
-        Смена пресета каждые:
-        <span class="field-value">{{ presetCycleSeconds }} сек</span>
+    <template v-if="selectedVisualizer === 'butterchurn'">
+      <label class="random-toggle">
+        <input type="checkbox" v-model="isRandomOrder" />
+        Случайный порядок
       </label>
-      <input
-        id="cycle-length"
-        type="range"
-        min="3"
-        max="300"
-        step="1"
-        v-model.number="presetCycleSeconds"
-        class="slider"
-      />
-    </div>
 
-    <label class="field-label" for="preset-select">Пресет</label>
-    <select
-      id="preset-select"
-      v-model="selectedPresetKey"
-      class="preset-select"
-      :disabled="isRandomOrder || presetKeys.length === 0"
-    >
-      <option v-if="presetKeys.length === 0" value="" disabled>
-        Загрузка пресетов…
-      </option>
-      <option v-for="key in presetKeys" :key="key" :value="key">
-        {{ key }}
-      </option>
-    </select>
+      <div class="field">
+        <label class="field-label" for="cycle-length">
+          Смена пресета каждые: <span class="field-value">{{ presetCycleSeconds }} сек</span>
+        </label>
+        <input
+          id="cycle-length"
+          type="range"
+          min="3"
+          max="300"
+          step="1"
+          v-model.number="presetCycleSeconds"
+          class="slider"
+        />
+      </div>
+
+      <label class="field-label" for="preset-select">Пресет</label>
+      <select
+        id="preset-select"
+        v-model="selectedPresetKey"
+        class="preset-select"
+        :disabled="isRandomOrder || presetKeys.length === 0"
+      >
+        <option v-if="presetKeys.length === 0" value="" disabled>Загрузка пресетов…</option>
+        <option v-for="key in presetKeys" :key="key" :value="key">
+          {{ key }}
+        </option>
+      </select>
+    </template>
+
+    <template v-else-if="selectedVisualizer === 'custom'">
+      <label class="field-label" for="custom-preset-select">Пресет</label>
+      <select id="custom-preset-select" v-model="selectedCustomPreset" class="preset-select">
+        <option v-for="preset in customPresets" :key="preset.key" :value="preset.key">
+          {{ preset.label }}
+        </option>
+      </select>
+    </template>
 
     <div v-if="currentPresetKey" class="current-preset">
       Сейчас: <span class="current-preset-name">{{ currentPresetKey }}</span>
@@ -73,9 +87,7 @@ const { enabledMap, valueMap } = useCanvasFilters();
           v-model.number="valueMap[filter.key]"
           :disabled="!enabledMap[filter.key]"
         />
-        <span class="filter-value"
-          >{{ valueMap[filter.key] }}{{ filter.unit }}</span
-        >
+        <span class="filter-value">{{ valueMap[filter.key] }}{{ filter.unit }}</span>
       </div>
     </div>
   </div>
@@ -97,7 +109,7 @@ const { enabledMap, valueMap } = useCanvasFilters();
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   z-index: 20;
   color: #e6e6e6;
-  font-family: "Segoe UI", sans-serif;
+  font-family: 'Segoe UI', sans-serif;
   font-size: 0.85rem;
 }
 
@@ -183,12 +195,12 @@ const { enabledMap, valueMap } = useCanvasFilters();
 .filter-toggle {
   display: flex;
   align-items: center;
-  text-wrap: nowrap;
   gap: 6px;
   cursor: pointer;
   user-select: none;
   color: #ccc;
   font-size: 0.8rem;
+  white-space: nowrap;
 }
 
 .filter-value {

@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useAudioPlayer } from '../composables/useAudioPlayer'
 import { useVisualizerSelection } from '../composables/useVisualizerSelection'
 import { usePlaylist } from '../composables/usePlaylist'
-import ButterchurnSettingsPanel from './ButterchurnSettingsPanel.vue'
+import VisualizerSettingsPanel from './VisualizerSettingsPanel.vue'
 
 const {
   isPlaying,
@@ -157,7 +157,7 @@ function toggleSettings() {
         >
           ⚙
         </button>
-        <ButterchurnSettingsPanel v-if="showSettings" />
+        <VisualizerSettingsPanel v-if="showSettings" />
       </div>
 
       <div class="cell">

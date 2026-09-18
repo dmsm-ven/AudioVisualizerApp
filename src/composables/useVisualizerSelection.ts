@@ -7,7 +7,7 @@ export interface VisualizerOption {
 
 export const visualizers: VisualizerOption[] = [
   { value: 'butterchurn', label: 'MilkDrop (Butterchurn)' },
-  { value: 'custom-glass-rain', label: 'Custom' },
+  { value: 'custom', label: 'Custom' },
 ]
 
 const selectedVisualizer = ref<string>(visualizers[0]?.value ?? 'bars')

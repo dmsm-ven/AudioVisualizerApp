@@ -6,6 +6,8 @@
 //  - три частотных диапазона (бас/середина/верх) управляют яркостью и цветом
 //    трёх фоновых цветовых пятен.
 
+import { bandEnergy } from './audioUtils'
+
 interface Drop {
   x: number
   y: number
@@ -25,16 +27,6 @@ interface Ripple {
 const MAX_DROPS = 140
 const TRAIL_LENGTH = 10
 const BASS_HISTORY_LENGTH = 40
-
-function bandEnergy(data: Uint8Array, fromRatio: number, toRatio: number): number {
-  const from = Math.floor(data.length * fromRatio)
-  const to = Math.max(from + 1, Math.floor(data.length * toRatio))
-  let sum = 0
-  for (let i = from; i < to; i++) {
-    sum += data[i] ?? 0
-  }
-  return sum / (to - from) / 255
-}
 
 export function createGlassRainEffect() {
   let drops: Drop[] = []
